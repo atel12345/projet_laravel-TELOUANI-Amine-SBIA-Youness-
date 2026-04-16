@@ -2,54 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\LoginRequest;
+use App\Http\Requests\Auth\RegisterRequest;
 use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Tymon\JWTAuth\Facades\JWTAuth;
+use Illuminate\Support\Facades\Auth;
+
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    public function register(RegisterRequest $request)
     {
+        $data = $request->validated();
+
         $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => Hash::make($request->password),
-            'role' => $request->role ?? 'candidat'
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'role' => $data['role'],
         ]);
 
         $token = JWTAuth::fromUser($user);
 
         return response()->json([
             'user' => $user,
-            'token' => $token
+            'token' => $token,
         ], 201);
     }
 
-    public function login(Request $request)
+    public function login(LoginRequest $request)
     {
-        $credentials = $request->only('email', 'password');
+        $credentials = $request->validated();
 
         if (!$token = JWTAuth::attempt($credentials)) {
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
         return response()->json([
-            'token' => $token
+            'token' => $token,
         ]);
     }
 
     public function me()
     {
-        return response()->json(auth()->user());
+        return response()->json(Auth::user());
     }
 
     public function logout()
     {
-        auth()->logout();
+        Auth::logout();
 
         return response()->json([
-            'message' => 'Successfully logged out'
+            'message' => 'Successfully logged out',
         ]);
     }
 }
