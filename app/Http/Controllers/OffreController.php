@@ -2,67 +2,63 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Offre\StoreOffreRequest;
+use App\Http\Requests\Offre\UpdateOffreRequest;
 use App\Models\Offre;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
 
 class OffreController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        $query = Offre::where('actif', true)->orderBy('created_at', 'desc');
+        $query = Offre::query()
+            ->where('actif', true)
+            ->when($request->filled('localisation'), fn ($q) => $q->where('localisation', $request->string('localisation')))
+            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
+            ->orderByDesc('created_at');
 
-        if ($request->has('localisation')) {
-            $query->where('localisation', $request->localisation);
-        }
+        $offres = $query->paginate(10);
 
-        if ($request->has('type')) {
-            $query->where('type', $request->type);
-        }
-
-        return response()->json($query->paginate(10));
+        return response()->json($offres);
     }
 
-    public function show(Offre $offre)
+    public function show(Offre $offre): JsonResponse
     {
+        if (!$offre->actif) {
+            return response()->json(['message' => 'Offre not found'], 404);
+        }
+
         return response()->json($offre);
     }
 
-    public function store(Request $request)
+    public function store(StoreOffreRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'titre' => 'required|string',
-            'description' => 'required|string',
-            'localisation' => 'nullable|string',
-            'type' => 'required|in:CDI,CDD,stage',
+        $offre = Offre::create([
+            ...$request->validated(),
+            'user_id' => Auth::id(),
         ]);
-
-        $offre = auth()->user()->offres()->create($data);
 
         return response()->json($offre, 201);
     }
 
-    public function update(Request $request, Offre $offre)
+    public function update(UpdateOffreRequest $request, Offre $offre): JsonResponse
     {
-        if ($offre->user_id !== auth()->id()) {
-            return response()->json(['error' => 'Forbidden'], 403);
+        if ($offre->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $data = $request->validate([
-            'titre' => 'sometimes|string',
-            'description' => 'sometimes|string',
-            'localisation' => 'nullable|string',
-            'type' => 'sometimes|in:CDI,CDD,stage',
-        ]);
-
-        $offre->update($data);
+        $offre->update($request->validated());
 
         return response()->json($offre);
     }
 
-    public function destroy(Offre $offre)
+    public function destroy(Offre $offre): JsonResponse
     {
-        if ($offre->user_id !== auth()->id()) {
-            return response()->json(['error' => 'Forbidden'], 403);
+        if ($offre->user_id !== Auth::id()) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         $offre->delete();
