@@ -2,74 +2,90 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Models\Competence;
+use App\Http\Requests\Profil\AttachCompetenceRequest;
+use App\Http\Requests\Profil\StoreProfilRequest;
+use App\Http\Requests\Profil\UpdateProfilRequest;
+use App\Models\Profil;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\JsonResponse;
 
 class ProfilController extends Controller
 {
-    public function store(Request $request)
+    public function store(StoreProfilRequest $request): JsonResponse
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         if ($user->profil) {
-            return response()->json(['error' => 'Profil already exists'], 422);
+            return response()->json(['message' => 'Profil already exists'], 422);
         }
 
-        $data = $request->validate([
-            'titre' => 'required|string',
-            'bio' => 'nullable|string',
-            'localisation' => 'nullable|string',
-            'disponible' => 'boolean',
+        $profil = Profil::create([
+            ...$request->validated(),
+            'user_id' => $user->id,
         ]);
-
-        $profil = $user->profil()->create($data);
 
         return response()->json($profil, 201);
     }
 
-    public function show()
+    public function show(): JsonResponse
     {
-        return response()->json(auth()->user()->profil()->with('competences')->first());
-    }
+        $profil = Auth::user()->profil;
 
-    public function update(Request $request)
-    {
-        $profil = auth()->user()->profil;
+        if (!$profil) {
+            return response()->json(['message' => 'Profil not found'], 404);
+        }
 
-        $data = $request->validate([
-            'titre' => 'sometimes|string',
-            'bio' => 'nullable|string',
-            'localisation' => 'nullable|string',
-            'disponible' => 'boolean',
-        ]);
-
-        $profil->update($data);
+        $profil->load('competences');
 
         return response()->json($profil);
     }
 
-    public function addCompetence(Request $request)
+    public function update(UpdateProfilRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'competence_id' => 'required|exists:competences,id',
-            'niveau' => 'required|in:débutant,intermédiaire,expert',
-        ]);
+        $profil = Auth::user()->profil;
 
-        $profil = auth()->user()->profil;
+        if (!$profil) {
+            return response()->json(['message' => 'Profil not found'], 404);
+        }
 
-        $profil->competences()->syncWithoutDetaching([
-            $data['competence_id'] => ['niveau' => $data['niveau']]
-        ]);
+        $profil->update($request->validated());
 
-        return response()->json(['message' => 'Competence added']);
+        return response()->json($profil->fresh('competences'));
     }
 
-    public function removeCompetence($competence_id)
+    public function attachCompetence(AttachCompetenceRequest $request): JsonResponse
     {
-        $profil = auth()->user()->profil;
+        $profil = Auth::user()->profil;
 
-        $profil->competences()->detach($competence_id);
+        if (!$profil) {
+            return response()->json(['message' => 'Create profil first'], 422);
+        }
 
-        return response()->json(['message' => 'Competence removed']);
+        $data = $request->validated();
+
+        $profil->competences()->syncWithoutDetaching([
+            $data['competence_id'] => ['niveau' => $data['niveau']],
+        ]);
+
+        return response()->json([
+            'message' => 'Competence attached',
+            'profil' => $profil->fresh('competences'),
+        ]);
+    }
+
+    public function detachCompetence(int $competence): JsonResponse
+    {
+        $profil = Auth::user()->profil;
+
+        if (!$profil) {
+            return response()->json(['message' => 'Profil not found'], 404);
+        }
+
+        $profil->competences()->detach($competence);
+
+        return response()->json([
+            'message' => 'Competence detached',
+            'profil' => $profil->fresh('competences'),
+        ]);
     }
 }
