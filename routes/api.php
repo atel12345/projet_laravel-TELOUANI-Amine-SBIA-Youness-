@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CandidatureController;
 use App\Http\Controllers\OffreController;
@@ -34,5 +35,11 @@ Route::middleware('auth:api')->group(function () {
 
         Route::get('/offres/{offre}/candidatures', [CandidatureController::class, 'candidaturesOffre']);
         Route::patch('/candidatures/{candidature}/statut', [CandidatureController::class, 'updateStatut']);
+    });
+
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/admin/users', [AdminController::class, 'users']);
+        Route::delete('/admin/users/{user}', [AdminController::class, 'deleteUser']);
+        Route::patch('/admin/offres/{offre}', [AdminController::class, 'toggleOffre']);
     });
 });

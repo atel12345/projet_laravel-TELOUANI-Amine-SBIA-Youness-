@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CandidatureDeposee;
+use App\Events\StatutCandidatureMis;
 use App\Http\Requests\Candidature\ApplyToOffreRequest;
 use App\Http\Requests\Candidature\UpdateCandidatureStatusRequest;
 use App\Models\Candidature;
@@ -37,6 +39,8 @@ class CandidatureController extends Controller
             'message' => $request->validated()['message'] ?? null,
             'statut' => 'en_attente',
         ]);
+
+        CandidatureDeposee::dispatch($candidature);
 
         return response()->json($candidature, 201);
     }
@@ -79,9 +83,14 @@ class CandidatureController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        $ancienStatut = $candidature->statut;
+        $nouveauStatut = $request->validated()['statut'];
+
         $candidature->update([
-            'statut' => $request->validated()['statut'],
+            'statut' => $nouveauStatut,
         ]);
+
+        StatutCandidatureMis::dispatch($candidature->fresh(), $ancienStatut, $nouveauStatut);
 
         return response()->json($candidature->fresh(['offre', 'profil.user']));
     }
