@@ -2,7 +2,8 @@
 
 ## Description
 
-Ce projet est un backend Laravel pour une plateforme type mini-LinkedIn.
+Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn.
+Une interface React/Vite a ete ajoutee comme couche optionnelle pour tester et utiliser l'API plus facilement.
 
 Entites principales:
 
@@ -18,7 +19,7 @@ Entites principales:
 - Laravel ^13
 - MySQL
 - JWT Auth: tymon/jwt-auth ^2.3
-- Front build: Vite ^8 + TailwindCSS ^4
+- Front add-on: React ^19, Vite ^8, TailwindCSS ^4
 
 ## Dependances Principales
 
@@ -71,6 +72,8 @@ composer install
 npm install
 ```
 
+Si vous ne voulez utiliser que le backend, cette etape n'est pas obligatoire. Elle sert uniquement pour l'interface React ajoutee au projet.
+
 4. Creer le fichier d'environnement:
 
 ```bash
@@ -101,6 +104,12 @@ php artisan jwt:secret
 php artisan migrate:fresh --seed
 ```
 
+8. Compiler le front si vous voulez l'utiliser:
+
+```bash
+npm run build
+```
+
 ## Lancement du Projet
 
 Option recommandee (backend + frontend en une commande):
@@ -129,7 +138,7 @@ Backend Laravel:
 php artisan serve
 ```
 
-Frontend Vite:
+Frontend React/Vite en mode developpement:
 
 ```bash
 npm run dev
