@@ -4,7 +4,10 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite --host 127.0.0.1"
+        "dev": "vite --host 127.0.0.1",
+        "serve": "php artisan serve --host=127.0.0.1 --port=8000",
+        "dev:clean": "php artisan optimize:clear && php -r \"if (file_exists('public/hot')) unlink('public/hot');\"",
+        "dev:full": "npm run dev:clean && concurrently \"npm run serve\" \"npm run dev\""
     },
     "devDependencies": {
         "@vitejs/plugin-react": "^5.0.0",

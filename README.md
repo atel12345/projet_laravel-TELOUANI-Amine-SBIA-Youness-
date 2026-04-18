@@ -103,17 +103,103 @@ php artisan migrate:fresh --seed
 
 ## Lancement du Projet
 
+Option recommandee (backend + frontend en une commande):
+
+```bash
+npm run dev:full
+```
+
+Puis ouvrir:
+
+```text
+http://127.0.0.1:8000
+```
+
+Important:
+
+- `npm run dev` seul demarre uniquement Vite (HMR), pas la page Laravel complete.
+- Si vous ouvrez l'URL Vite (ex: `http://127.0.0.1:5173` ou `5174`), vous verrez la page d'aide Vite et non l'app React Laravel.
+- Le script `dev:full` nettoie automatiquement les caches Laravel et le fichier `public/hot` avant de demarrer, ce qui evite les problemes de preamble React/Vite sur d'autres machines.
+
+Execution separee (si necessaire):
+
 Backend Laravel:
 
 ```bash
 php artisan serve
 ```
 
-Build front (optionnel):
+Frontend Vite:
 
 ```bash
 npm run dev
 ```
+
+## Resolution Erreur React Preamble
+
+Si vous voyez l'erreur `@vitejs/plugin-react can't detect preamble`, les protections suivantes sont deja en place:
+
+- `@viteReactRefresh` est injecte dans la Blade avant `@vite`, ce qui installe correctement le preamble React.
+- Nettoyage automatique de l'etat de dev avant chaque `npm run dev:full`.
+
+Procedure recommandee:
+
+1. Arreter tous les serveurs Node/PHP en cours.
+2. Executer `npm run dev:full`.
+3. Ouvrir uniquement `http://127.0.0.1:8000`.
+
+## Donner Acces Au Professeur Sans Hosting Payant
+
+Option la plus simple: partager temporairement votre machine locale via un tunnel.
+
+### Option 1: Cloudflare Tunnel (gratuit)
+
+1. Installer `cloudflared`.
+2. Demarrer le projet avec `npm run dev:full`.
+3. Dans un autre terminal, lancer:
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+
+4. Partager l'URL HTTPS publique generee avec votre professeur.
+
+Avantages:
+
+- Gratuit.
+- HTTPS direct.
+- Stable pour une demo en direct.
+
+### Option 2: ngrok (plan gratuit)
+
+1. Demarrer le projet avec `npm run dev:full`.
+2. Lancer:
+
+```bash
+ngrok http 8000
+```
+
+3. Partager l'URL HTTPS ngrok.
+
+### Option 3: GitHub + video + guide de lancement (zero infra)
+
+Si l'acces reseau est complique:
+
+1. Pousser le code complet sur GitHub.
+2. Fournir ce README + un court screencast (2-3 min).
+3. Donner les commandes exactes:
+
+```bash
+composer install
+copy .env.example .env
+php artisan key:generate
+php artisan jwt:secret
+php artisan migrate:fresh --seed
+npm install
+npm run dev:full
+```
+
+Cette option ne publie pas l'application en ligne, mais reste souvent acceptee pour une evaluation academique.
 
 ## Seeders Inclus
 
