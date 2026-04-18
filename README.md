@@ -2,8 +2,8 @@
 
 ## Description
 
-Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn.
-Une interface React/Vite a ete ajoutee comme couche optionnelle pour tester et utiliser l'API plus facilement.
+Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn. 
+Nous avons aussi construit une interface frontend React/Vite, mais elle reste secondaire par rapport au backend et sert surtout a faciliter l'utilisation de l'API.
 
 Entites principales:
 
@@ -147,6 +147,7 @@ npm run dev
 ## Resolution Erreur React Preamble
 
 Si vous voyez l'erreur `@vitejs/plugin-react can't detect preamble`, les protections suivantes sont deja en place:
+Le frontend existe bien dans le projet, mais il reste volontairement plus simple et moins central que le backend.
 
 - `@viteReactRefresh` est injecte dans la Blade avant `@vite`, ce qui installe correctement le preamble React.
 - Nettoyage automatique de l'etat de dev avant chaque `npm run dev:full`.
