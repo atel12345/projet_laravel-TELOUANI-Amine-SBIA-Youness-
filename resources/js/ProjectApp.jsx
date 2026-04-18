@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 const API_BASE = '/api';
 
@@ -47,6 +47,7 @@ function ProjectApp() {
     const [notice, setNotice] = useState('');
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
+    const applicationFormRef = useRef(null);
 
     const authHeaders = useMemo(() => {
         const headers = { Accept: 'application/json' };
@@ -84,12 +85,14 @@ function ProjectApp() {
     }, [me]);
 
     async function request(path, options = {}) {
+        const { headers: customHeaders = {}, ...restOptions } = options;
+
         const response = await fetch(`${API_BASE}${path}`, {
+            ...restOptions,
             headers: {
                 ...authHeaders,
-                ...(options.headers ?? {}),
+                ...customHeaders,
             },
-            ...options,
         });
 
         const rawBody = await response.text();
@@ -297,17 +300,48 @@ function ProjectApp() {
         }
     }
 
-    async function toggleOffer(offerId) {
+    async function toggleOffer(offer) {
         try {
-            await request(`/admin/offres/${offerId}`, { method: 'PATCH' });
-            setNotice('Offre mise à jour.');
-            await loadOffers();
+            const updated = await request(`/admin/offres/${offer.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ actif: !offer.actif }),
+            });
+
+            const nextActif = Boolean(updated?.offre?.actif ?? !offer.actif);
+
+            setOffers((current) => current.map((item) => (item.id === offer.id ? { ...item, actif: nextActif } : item)));
+            setNotice(nextActif ? `Offre ${offer.id} activée.` : `Offre ${offer.id} désactivée.`);
+
+            if (!nextActif) {
+                setOffers((current) => current.filter((item) => item.id !== offer.id));
+            }
         } catch (error) {
             setError(error.message);
         }
     }
 
+    function handleSelectOffer(offerId) {
+        setError('');
+        setApplicationForm((current) => ({ ...current, offre_id: String(offerId) }));
+
+        if (!token) {
+            setAuthMode('login');
+            setNotice('Offre sélectionnée. Connectez-vous en candidat pour postuler.');
+            return;
+        }
+
+        if (me?.role !== 'candidat') {
+            setNotice('Offre sélectionnée. Seul un compte candidat peut envoyer une candidature.');
+            return;
+        }
+
+        setNotice(`Offre #${offerId} sélectionnée. Complétez votre message puis cliquez sur Postuler.`);
+        applicationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     const role = me?.role ?? 'visiteur';
+    const selectedOfferId = Number(applicationForm.offre_id) || null;
 
     return (
         <div className="min-h-screen bg-[#07111f] text-white">
@@ -432,7 +466,7 @@ function ProjectApp() {
 
                             <div className="mt-5 grid gap-4 md:grid-cols-2">
                                 {offers.map((offer) => (
-                                    <article key={offer.id} className="flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-5">
+                                    <article key={offer.id} className={`flex h-full flex-col rounded-3xl border p-5 ${selectedOfferId === offer.id ? 'border-cyan-300/70 bg-cyan-300/10' : 'border-white/10 bg-white/5'}`}>
                                         <div className="flex items-start justify-between gap-4">
                                             <div>
                                                 <h3 className="text-lg font-semibold text-white">{offer.titre}</h3>
@@ -446,15 +480,21 @@ function ProjectApp() {
                                             </span>
                                             <button
                                                 type="button"
-                                                onClick={() => setApplicationForm({ ...applicationForm, offre_id: offer.id })}
-                                                className="rounded-full bg-cyan-300/15 px-4 py-2 text-sm text-cyan-100 transition hover:bg-cyan-300/25"
+                                                onClick={() => handleSelectOffer(offer.id)}
+                                                className={`rounded-full px-4 py-2 text-sm transition ${selectedOfferId === offer.id ? 'bg-cyan-300 text-slate-950' : 'bg-cyan-300/15 text-cyan-100 hover:bg-cyan-300/25'}`}
                                             >
-                                                Sélectionner
+                                                {selectedOfferId === offer.id ? 'Sélectionnée' : 'Sélectionner'}
                                             </button>
                                         </div>
                                     </article>
                                 ))}
                             </div>
+
+                            {selectedOfferId ? (
+                                <p className="mt-4 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm text-cyan-100">
+                                    Offre sélectionnée: #{selectedOfferId}. Faites défiler vers l'espace candidat pour envoyer la candidature.
+                                </p>
+                            ) : null}
                         </section>
 
                         {token && me?.role === 'candidat' && (
@@ -475,7 +515,7 @@ function ProjectApp() {
                                         </button>
                                     </form>
 
-                                    <form onSubmit={handleApply} className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5">
+                                    <form ref={applicationFormRef} onSubmit={handleApply} className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-5">
                                         <h3 className="text-sm uppercase tracking-[0.3em] text-slate-400">Candidature</h3>
                                         <input className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none placeholder:text-slate-500" placeholder="ID de l'offre" value={applicationForm.offre_id} onChange={(event) => setApplicationForm({ ...applicationForm, offre_id: event.target.value })} />
                                         <textarea className="min-h-28 rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-white outline-none placeholder:text-slate-500" placeholder="Message" value={applicationForm.message} onChange={(event) => setApplicationForm({ ...applicationForm, message: event.target.value })} />
@@ -550,11 +590,8 @@ function ProjectApp() {
                                                         <div className="font-medium text-white">{offer.titre}</div>
                                                         <div className="text-xs text-slate-400">ID {offer.id} • {offer.type}</div>
                                                     </div>
-                                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                                        <span className={`inline-flex w-fit rounded-full px-3 py-1 text-xs font-medium ${offer.actif ? 'bg-emerald-400/15 text-emerald-100' : 'bg-slate-700/40 text-slate-300'}`}>
-                                                            {offer.actif ? 'Active' : 'Inactive'}
-                                                        </span>
-                                                        <button type="button" onClick={() => toggleOffer(offer.id)} className="inline-flex w-full justify-center rounded-full bg-cyan-300/15 px-4 py-2 text-xs text-cyan-100 transition hover:bg-cyan-300/25 sm:w-auto">
+                                                    <div className="flex justify-end">
+                                                        <button type="button" onClick={() => toggleOffer(offer)} className="inline-flex w-full justify-center rounded-full bg-cyan-300/15 px-4 py-2 text-xs text-cyan-100 transition hover:bg-cyan-300/25 sm:w-auto">
                                                             Basculer
                                                         </button>
                                                     </div>
