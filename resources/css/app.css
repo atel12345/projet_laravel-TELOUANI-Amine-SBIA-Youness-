@@ -9,3 +9,19 @@
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 }
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-sans);
+    background:
+        radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 30%),
+        radial-gradient(circle at top right, rgba(16, 185, 129, 0.16), transparent 28%),
+        #07111f;
+}
+
+#app {
+    min-height: 100vh;
+}
