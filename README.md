@@ -2,8 +2,8 @@
 
 ## Description
 
-Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn. 
-Nous avons aussi construit une interface frontend React/Vite, mais elle reste secondaire par rapport au backend et sert surtout a faciliter l'utilisation de l'API.
+Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn.
+Nous avons aussi construit une interface frontend React/Vite dans le projet, mais elle reste secondaire par rapport au backend et sert surtout a faciliter l'utilisation de l'API.
 
 Entites principales:
 
@@ -219,25 +219,6 @@ Ordre d'execution via `DatabaseSeeder`:
 - `UserSeeder`
 - `OffreSeeder`
 - `CandidatureSeeder`
-
-## Collaboration GitHub
-
-Regles importantes:
-
-- Ne jamais commit `.env`
-- Ne jamais commit des credentials reels
-- Chaque membre du binome utilise son propre `.env`
-
-Verification rapide avant push:
-
-```bash
-git ls-files | findstr /I ".env"
-```
-
-Resultat attendu:
-
-- `.env.example` present
-- `.env` absent
 
 ## Collection Postman (Scenarios Complets)
 
