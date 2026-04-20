@@ -160,100 +160,445 @@ Procedure recommandee:
 
 ## Backend Implementation
 
-Cette section resume le travail realise sur le backend selon les specifications du projet.
+Le backend a ete developpe en conformite stricte avec les specifications du projet, couvrant modele de donnees, authentification JWT, endpoints API, et systeme d'events pour le logging.
 
 ### Partie 1: Modelisation & Base de Donnees
 
-Implementation complete de la base de donnees relationnelle:
+La base de donnees repose sur 5 entites principales avec relations Eloquent complexes.
 
-- **Migrations**: Creation de toutes les tables conformes au Modele Logique de Donnees (MLD):
-  - `users` avec colonne `role` enum (candidat, recruteur, admin)
-  - `profils` lies aux candidats
-  - `competences` et pivot `profil_competence` avec niveau (debutant, intermediaire, expert)
-  - `offres` publiees par les recruteurs
-  - `candidatures` representant les applications aux offres
+**Migrations et Schema**:
 
-- **Modeles Eloquent**: Implementation des relations:
-  - `User` hasMany Offres (pour recruteurs) et hasOne Profil (pour candidats)
-  - `Profil` belongsTo User et belongsToMany Competences
-  - `Offre` belongsTo User et hasMany Candidatures
-  - `Candidature` belongsTo Offre et belongsTo Profil
+Les migrations Laravel creent toutes les tables selon le MLD fourni. Exemple pour la table des utilisateurs:
 
-- **Factories**: Generateurs de donnees pour tests:
-  - `UserFactory` avec roles aleatoires
-  - `OffreFactory` avec titres et descriptions varies
-  - `ProfilFactory`, `CompetenceFactory`, `CandidatureFactory`
+```php
+Schema::create('users', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('email')->unique();
+    $table->string('password');
+    $table->enum('role', ['candidat', 'recruteur', 'admin']);
+    $table->timestamps();
+});
+```
 
-- **Seeders**: Population initiale de la base de donnees:
-  - 2 administrateurs
-  - 5 recruteurs avec 2 a 3 offres chacun (13 offres differentes couvrant roles IT et non-IT)
-  - 10 candidats avec profils complets et competences
-  - Toutes les offres contiennent des descriptions francaises et sont localisees en villes francaises
+La table `profils` pour les candidats:
+
+```php
+Schema::create('profils', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained();
+    $table->string('titre');
+    $table->text('bio');
+    $table->string('localisation');
+    $table->boolean('disponible')->default(true);
+    $table->timestamps();
+});
+```
+
+Pivot table pour la relation many-to-many entre profils et competences:
+
+```php
+Schema::create('profil_competence', function (Blueprint $table) {
+    $table->foreignId('profil_id')->constrained();
+    $table->foreignId('competence_id')->constrained();
+    $table->enum('niveau', ['debutant', 'intermediaire', 'expert']);
+});
+```
+
+Table des offres publiees par recruteurs:
+
+```php
+Schema::create('offres', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('user_id')->constrained(); // recruteur proprietaire
+    $table->string('titre');
+    $table->text('description');
+    $table->string('localisation');
+    $table->enum('type', ['CDI', 'CDD', 'stage']);
+    $table->boolean('actif')->default(true);
+    $table->timestamps();
+});
+```
+
+Table des candidatures (applications):
+
+```php
+Schema::create('candidatures', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('offre_id')->constrained();
+    $table->foreignId('profil_id')->constrained();
+    $table->text('message');
+    $table->enum('statut', ['en_attente', 'acceptee', 'refusee'])->default('en_attente');
+    $table->timestamps();
+});
+```
+
+**Modeles Eloquent et Relations**:
+
+Modele `User` avec relations pour les differents roles:
+
+```php
+class User extends Authenticatable {
+    public function offres() { // Pour recruteurs
+        return $this->hasMany(Offre::class);
+    }
+    
+    public function profil() { // Pour candidats
+        return $this->hasOne(Profil::class);
+    }
+}
+```
+
+Modele `Profil` avec relation many-to-many vers competences:
+
+```php
+class Profil extends Model {
+    public function user() {
+        return $this->belongsTo(User::class);
+    }
+    
+    public function competences() {
+        return $this->belongsToMany(Competence::class, 'profil_competence')
+                    ->withPivot('niveau');
+    }
+    
+    public function candidatures() {
+        return $this->hasMany(Candidature::class);
+    }
+}
+```
+
+Modele `Offre` avec ses candidatures:
+
+```php
+class Offre extends Model {
+    public function user() {
+        return $this->belongsTo(User::class); // Recruteur proprietaire
+    }
+    
+    public function candidatures() {
+        return $this->hasMany(Candidature::class);
+    }
+}
+```
+
+**Factories et Seeders**:
+
+Factory pour generer des offres avec donnees variees:
+
+```php
+class OffreFactory extends Factory {
+    public function definition(): array {
+        $jobs = [
+            'Senior Developper PHP', 'Infirmier', 'Professeur de Mathematiques',
+            'Comptable', 'Manager de Projet', 'Architecte Logiciel',
+            'Community Manager', 'Electricien', 'Chef de Cuisine',
+            'Conducteur de Bus', 'Psychologue', 'Webdesigner', 'DevOps Engineer'
+        ];
+        
+        return [
+            'titre' => $this->faker->randomElement($jobs),
+            'description' => $this->faker->paragraph(5),
+            'localisation' => $this->faker->randomElement(['Paris', 'Lyon', 'Marseille', 'Toulouse']),
+            'type' => $this->faker->randomElement(['CDI', 'CDD', 'stage']),
+            'actif' => true,
+        ];
+    }
+}
+```
+
+Seeder pour initialiser la base de donnees:
+
+```php
+class DatabaseSeeder extends Seeder {
+    public function run(): void {
+        Competence::factory(15)->create();
+        User::factory(2)->recruteur()->create();  // 2 admins
+        
+        User::factory(5)->recruteur()->create()->each(function ($user) {
+            $user->offres()->createMany(
+                Offre::factory(rand(2, 3))->make()->toArray()
+            );
+        });
+        
+        User::factory(10)->candidat()->create()->each(function ($user) {
+            $profil = Profil::factory()->create(['user_id' => $user->id]);
+            $profil->competences()->attach(
+                Competence::inRandomOrder()->limit(rand(2, 5))->pluck('id')
+            );
+        });
+    }
+}
+```
 
 ### Partie 2: Authentification & Autorisation
 
-Implementation complete du systeme d'authentification et d'autorisation:
+**JWT Setup**:
 
-- **JWT (JSON Web Tokens)**: Integration de `tymon/jwt-auth` ^2.3
-  - Configuration JWT dans `config/jwt.php`
-  - Middleware `auth:api` pour proteger les routes
-  - Tokens generes a l'inscription et connexion
+Configuration dans `config/jwt.php` apres installation de `tymon/jwt-auth`:
 
-- **Autorisation par Roles**: Middleware personnalise verifiant les roles:
-  - Routes candidat: accessibles uniquement par role `candidat`
-  - Routes recruteur: accessibles uniquement par role `recruteur`
-  - Routes admin: accessibles uniquement par role `admin`
-  - Ownership rules: Recruteur ne peut modifier/supprimer que ses propres offres, candidat ne voit que ses propres candidatures
-  - Reponse 403 en cas d'acces non autorise
+```php
+'secret' => env('JWT_SECRET'),
+'ttl' => 60, // Token valide 60 minutes
+'refresh_ttl' => 20160, // Refresh token 2 semaines
+```
+
+Middleware `auth:api` applique sur les routes protegees:
+
+```php
+Route::middleware('auth:api')->group(function () {
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/me', [AuthController::class, 'me']);
+});
+```
+
+**Authentification Utilisateur**:
+
+Controller `AuthController` gerant inscription/login:
+
+```php
+class AuthController extends Controller {
+    public function register(Request $request) {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|min:8',
+            'role' => 'required|in:candidat,recruteur,admin'
+        ]);
+        
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role' => $validated['role']
+        ]);
+        
+        $token = Auth::login($user);
+        return response()->json(['token' => $token]);
+    }
+    
+    public function login(Request $request) {
+        $credentials = $request->validate([
+            'email' => 'required|email',
+            'password' => 'required'
+        ]);
+        
+        if (!$token = Auth::attempt($credentials)) {
+            return response()->json(['error' => 'Invalid credentials'], 401);
+        }
+        
+        return response()->json(['token' => $token]);
+    }
+}
+```
+
+**Middleware de Role**:
+
+Middleware personnalise `RoleMiddleware` verifiant les roles:
+
+```php
+class RoleMiddleware {
+    public function handle($request, Closure $next, ...$roles) {
+        if (!Auth::check()) {
+            return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+        
+        if (!in_array(Auth::user()->role, $roles)) {
+            return response()->json(['error' => 'Forbidden'], 403);
+        }
+        
+        return $next($request);
+    }
+}
+```
+
+Utilisation dans les routes:
+
+```php
+Route::post('/offres', [OffreController::class, 'store'])
+    ->middleware('auth:api', 'role:recruteur');
+
+Route::post('/offres/{offre}/candidater', [CandidatureController::class, 'store'])
+    ->middleware('auth:api', 'role:candidat');
+```
 
 ### Partie 3: Endpoints de l'API
 
-Implementation complete de tous les endpoints specifies:
+**Endpoints d'Authentification** (publiques):
 
-- **Authentification** (publique):
-  - `POST /api/register` - Inscription avec role
-  - `POST /api/login` - Connexion et generation JWT
-  - `GET /api/me` - Utilisateur courant (JWT)
-  - `POST /api/logout` - Deconnexion (JWT)
+```
+POST   /api/register
+POST   /api/login
+GET    /api/me           (auth:api)
+POST   /api/logout       (auth:api)
+```
 
-- **Gestion Profil** (role candidat):
-  - `POST /api/profil` - Creation du profil (une seule fois)
-  - `GET /api/profil` - Consultation du profil personnel
-  - `PUT /api/profil` - Modification du profil
-  - `POST /api/profil/competences` - Ajout de competences avec niveau
-  - `DELETE /api/profil/competences/{competence}` - Retrait de competences
+**Gestion du Profil** (role candidat):
 
-- **Gestion Offres** (tous):
-  - `GET /api/offres` - Liste des offres actives avec pagination (10 par page), tri par date, filtres localisation et type
-  - `GET /api/offres/{offre}` - Detail d'une offre
-  - `POST /api/offres` - Creation (role recruteur)
-  - `PUT /api/offres/{offre}` - Modification (role recruteur, proprietaire)
-  - `DELETE /api/offres/{offre}` - Suppression (role recruteur, proprietaire)
+```
+POST   /api/profil                      (candidat) - Creer profil
+GET    /api/profil                      (candidat) - Consulter son profil
+PUT    /api/profil                      (candidat) - Modifier profil
+POST   /api/profil/competences          (candidat) - Ajouter competence
+DELETE /api/profil/competences/{id}     (candidat) - Retirer competence
+```
 
-- **Candidatures** (tous):
-  - `POST /api/offres/{offre}/candidater` - Postulation a une offre (role candidat)
-  - `GET /api/mes-candidatures` - Ses propres candidatures (role candidat)
-  - `GET /api/offres/{offre}/candidatures` - Candidatures recues (role recruteur, proprietaire)
-  - `PATCH /api/candidatures/{candidature}/statut` - Changement de statut (role recruteur, proprietaire)
+Exemple de creation de profil:
 
-- **Administration** (role admin):
-  - `GET /api/admin/users` - Liste de tous les utilisateurs
-  - `DELETE /api/admin/users/{user}` - Suppression d'un compte
-  - `PATCH /api/admin/offres/{offre}` - Activation/desactivation des offres
+```php
+public function store(Request $request) {
+    $validated = $request->validate([
+        'titre' => 'required|string',
+        'bio' => 'required|string',
+        'localisation' => 'required|string',
+    ]);
+    
+    $profil = Profil::firstOrCreate(
+        ['user_id' => Auth::id()],
+        $validated
+    );
+    
+    return response()->json($profil, 201);
+}
+```
+
+**Gestion des Offres** (tous les roles):
+
+```
+GET    /api/offres                      (public) - Liste pagination 10, tri desc, filtre localisation/type
+GET    /api/offres/{offre}              (public) - Detail offre
+POST   /api/offres                      (recruteur) - Creer offre
+PUT    /api/offres/{offre}              (recruteur/proprietaire) - Modifier
+DELETE /api/offres/{offre}              (recruteur/proprietaire) - Supprimer
+```
+
+Methode listing avec pagination et filtres:
+
+```php
+public function index(Request $request) {
+    $query = Offre::where('actif', true)
+        ->orderBy('created_at', 'desc');
+    
+    if ($request->has('localisation')) {
+        $query->where('localisation', $request->localisation);
+    }
+    if ($request->has('type')) {
+        $query->where('type', $request->type);
+    }
+    
+    return $query->paginate(10);
+}
+```
+
+**Gestion des Candidatures**:
+
+```
+POST   /api/offres/{offre}/candidater   (candidat) - Postuler
+GET    /api/mes-candidatures            (candidat) - Ses candidatures
+GET    /api/offres/{offre}/candidatures (recruteur/proprietaire) - Candidatures recues
+PATCH  /api/candidatures/{id}/statut    (recruteur/proprietaire) - Changer statut
+```
+
+Exemple de postulation:
+
+```php
+public function candidater(Offre $offre, Request $request) {
+    $profil = Auth::user()->profil;
+    
+    $candidature = Candidature::create([
+        'offre_id' => $offre->id,
+        'profil_id' => $profil->id,
+        'message' => $request->message,
+        'statut' => 'en_attente'
+    ]);
+    
+    event(new CandidatureDeposee($candidature));
+    
+    return response()->json($candidature, 201);
+}
+```
+
+**Administration**:
+
+```
+GET    /api/admin/users                 (admin) - Liste utilisateurs
+DELETE /api/admin/users/{user}          (admin) - Supprimer user
+PATCH  /api/admin/offres/{offre}        (admin) - Toggle actif offre
+```
 
 ### Partie 4: Events & Listeners
 
-Implementation du systeme d'Events & Listeners pour le decouplage logique:
+Systeme d'events decouplant la logique applicative pour logging et audits.
 
-- **CandidatureDeposee**: Event declenche quand un candidat postule a une offre
-  - Listener enregistre l'evenement dans `storage/logs/candidatures.log`
-  - Informations loggees: date, nom du candidat, titre de l'offre
+**Event CandidatureDeposee**:
 
-- **StatutCandidatureMis**: Event declenche quand un recruteur change le statut d'une candidature
-  - Listener enregistre dans le meme fichier de log
-  - Informations loggees: ancien statut, nouveau statut, date
+```php
+class CandidatureDeposee {
+    public $candidature;
+    
+    public function __construct(Candidature $candidature) {
+        $this->candidature = $candidature;
+    }
+}
+```
 
-Ces events permettent un suivi complet des actions critiques independamment du controller, facilitant audits et monitoring.
+**Listener pour CandidatureDeposee**:
+
+```php
+class LogCandidatureDeposee implements ShouldQueue {
+    public function handle(CandidatureDeposee $event) {
+        $candidature = $event->candidature;
+        $candidat = $candidature->profil->user->name;
+        $offre = $candidature->offre->titre;
+        
+        Log::channel('candidatures')->info(
+            "Candidature deposee - Candidat: $candidat - Offre: $offre - Date: " . now()
+        );
+    }
+}
+```
+
+**Event StatutCandidatureMis**:
+
+```php
+class StatutCandidatureMis {
+    public $candidature;
+    public $ancienStatut;
+    
+    public function __construct(Candidature $candidature, $ancienStatut) {
+        $this->candidature = $candidature;
+        $this->ancienStatut = $ancienStatut;
+    }
+}
+```
+
+**Listener pour StatutCandidatureMis**:
+
+```php
+class LogStatutCandidatureMis implements ShouldQueue {
+    public function handle(StatutCandidatureMis $event) {
+        $ancien = $event->ancienStatut;
+        $nouveau = $event->candidature->statut;
+        
+        Log::channel('candidatures')->info(
+            "Statut change - Ancien: $ancien -> Nouveau: $nouveau - Date: " . now()
+        );
+    }
+}
+```
+
+Registration dans `EventServiceProvider`:
+
+```php
+protected $listen = [
+    CandidatureDeposee::class => [
+        LogCandidatureDeposee::class,
+    ],
+    StatutCandidatureMis::class => [
+        LogStatutCandidatureMis::class,
+    ],
+];
+```
 
 ## Frontend Implementation (Bonus)
 
@@ -269,42 +614,125 @@ En addition aux specifications du projet backend, nous avons developpe une inter
 
 ### Fonctionnalites Implementees
 
-**Authentification (public)**:
-- Page de connexion avec gestion d'erreurs
-- Page d'inscription avec selection de role (candidat/recruteur/admin)
+**Authentification**:
+- Connexion/Inscription avec selection de role
 - Persistence JWT automatique entre sessions
-- Deconnexion et nettoyage du localStorage
+- Deconnexion
 
 **Candidat**:
-- Creation et modification de profil (titre, bio, localisation, disponibilite)
-- Gestion des competences (ajout/suppression avec niveaux: debutant/intermediaire/expert)
-- Consultation des offres actives avec filtres (localisation, type)
-- Selection et consultation detaillee d'une offre
-- Postulation aux offres avec message personnalise
-- Suivi de ses candidatures et leurs statuts
+- Creation et modification de profil
+- Gestion des competences (ajout/suppression avec niveaux)
+- Consultation et filtrage des offres
+- Postulation aux offres avec message
+- Suivi des candidatures
 
 **Recruteur**:
-- Creation d'offres avec titre, description, localisation, type (CDI/CDD/stage)
-- Liste de ses offres avec possibilite de modification/suppression
-- Consultation des candidatures recues pour chaque offre
-- Changement du statut des candidatures (en_attente/acceptee/refusee)
-- Visualisation du profil et des competences des candidats
+- Creation et gestion des offres
+- Consultation des candidatures recues
+- Changement de statut des candidatures
 
 **Admin**:
-- Liste de tous les utilisateurs avec details (role, email, date creation)
-- Suppression de comptes utilisateurs
-- Activation/desactivation des offres (toggle)
-- Acces complet aux donnees de la plateforme
+- Gestion des utilisateurs
+- Activation/desactivation des offres
 
-### Choix Techniques
+### Code Principal
 
-- **Fetch Wrapper**: Fonction helper qui gere automatiquement les headers JWT et Content-Type
-- **Role-based Rendering**: Interface adaptee selon le role de l'utilisateur connecte
-- **Visual Feedback**: Indicateurs visuels pour confirmation d'actions (selection offre, changement statut)
-- **Error Handling**: Gestion des reponses d'erreur API (401, 403, 422) avec messages explicites
-- **State Management**: Utilisation exclusive de React hooks pour gestion etat simple et maintenable
+**Request Helper avec gestion JWT**:
 
-Cette interface frontend offre une experience utilisateur complete tout en restant basee sur l'API backend strictement definie dans les specifications.
+```javascript
+const request = async (endpoint, options = {}) => {
+  const token = localStorage.getItem('token');
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...options.headers
+  };
+  
+  const response = await fetch(`http://127.0.0.1:8000/api${endpoint}`, {
+    ...options,
+    headers
+  });
+  
+  if (!response.ok) throw new Error(`Error: ${response.status}`);
+  return response.json();
+};
+```
+
+**Authentification**:
+
+```javascript
+const handleLogin = async (email, password) => {
+  const data = await request('/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  
+  localStorage.setItem('token', data.token);
+  setUser(data.user);
+};
+
+const handleLogout = () => {
+  localStorage.removeItem('token');
+  setUser(null);
+};
+```
+
+**Selection et postulation a une offre** (role candidat):
+
+```javascript
+const handleSelectOffer = (offre) => {
+  setSelectedOffer(offre);
+  scrollToApplicationForm();
+};
+
+const handleApply = async (message) => {
+  const candidature = await request(`/offres/${selectedOffer.id}/candidater`, {
+    method: 'POST',
+    body: JSON.stringify({ message })
+  });
+  
+  setApplications([...applications, candidature]);
+};
+```
+
+**Gestion des offres** (role recruteur):
+
+```javascript
+const handleCreateOffer = async (formData) => {
+  const offre = await request('/offres', {
+    method: 'POST',
+    body: JSON.stringify(formData)
+  });
+  
+  setOffres([...offres, offre]);
+};
+
+const handleDeleteOffer = async (offreId) => {
+  await request(`/offres/${offreId}`, { method: 'DELETE' });
+  setOffres(offres.filter(o => o.id !== offreId));
+};
+```
+
+**Admin panel** (role admin):
+
+```javascript
+const toggleOfferStatus = async (offreId, currentStatus) => {
+  const updated = await request(`/admin/offres/${offreId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ actif: !currentStatus })
+  });
+  
+  setOffres(offres.map(o => o.id === offreId ? updated : o));
+};
+
+const deleteUser = async (userId) => {
+  await request(`/admin/users/${userId}`, { method: 'DELETE' });
+  setUsers(users.filter(u => u.id !== userId));
+};
+```
+
+L'interface adapte l'affichage selon le role de l'utilisateur et fournit une experience utilisateur complete tout en restant basee sur l'API backend strictement definie dans les specifications.
 
 ## Donner Acces Au Professeur Sans Hosting Payant
 
