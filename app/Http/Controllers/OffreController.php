@@ -16,8 +16,8 @@ class OffreController extends Controller
     {
         $query = Offre::query()
             ->where('actif', true)
-            ->when($request->filled('localisation'), fn ($q) => $q->where('localisation', $request->string('localisation')))
-            ->when($request->filled('type'), fn ($q) => $q->where('type', $request->string('type')))
+            ->when($request->filled('localisation'), fn($q) => $q->where('localisation', $request->string('localisation')))
+            ->when($request->filled('type'), fn($q) => $q->where('type', $request->string('type')))
             ->orderByDesc('created_at');
 
         $offres = $query->paginate(10);
