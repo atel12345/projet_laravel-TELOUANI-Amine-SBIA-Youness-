@@ -734,59 +734,6 @@ const deleteUser = async (userId) => {
 
 L'interface adapte l'affichage selon le role de l'utilisateur et fournit une experience utilisateur complete tout en restant basee sur l'API backend strictement definie dans les specifications.
 
-## Donner Acces Au Professeur Sans Hosting Payant
-
-Option la plus simple: partager temporairement votre machine locale via un tunnel.
-
-### Option 1: Cloudflare Tunnel (gratuit)
-
-1. Installer `cloudflared`.
-2. Demarrer le projet avec `npm run dev:full`.
-3. Dans un autre terminal, lancer:
-
-```bash
-cloudflared tunnel --url http://127.0.0.1:8000
-```
-
-4. Partager l'URL HTTPS publique generee avec votre professeur.
-
-Avantages:
-
-- Gratuit.
-- HTTPS direct.
-- Stable pour une demo en direct.
-
-### Option 2: ngrok (plan gratuit)
-
-1. Demarrer le projet avec `npm run dev:full`.
-2. Lancer:
-
-```bash
-ngrok http 8000
-```
-
-3. Partager l'URL HTTPS ngrok.
-
-### Option 3: GitHub + video + guide de lancement (zero infra)
-
-Si l'acces reseau est complique:
-
-1. Pousser le code complet sur GitHub.
-2. Fournir ce README + un court screencast (2-3 min).
-3. Donner les commandes exactes:
-
-```bash
-composer install
-copy .env.example .env
-php artisan key:generate
-php artisan jwt:secret
-php artisan migrate:fresh --seed
-npm install
-npm run dev:full
-```
-
-Cette option ne publie pas l'application en ligne, mais reste souvent acceptee pour une evaluation academique.
-
 ## Seeders Inclus
 
 Ordre d'execution via `DatabaseSeeder`:
