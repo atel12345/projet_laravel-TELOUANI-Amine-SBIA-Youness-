@@ -30,6 +30,16 @@ class AdminController extends Controller
         return response()->json(['message' => 'User deleted']);
     }
 
+    public function offres(): JsonResponse
+    {
+        $offres = Offre::query()
+            ->with(['recruteur:id,name,email'])
+            ->latest()
+            ->get();
+
+        return response()->json($offres);
+    }
+
     public function toggleOffre(ToggleOffreStatusRequest $request, Offre $offre): JsonResponse
     {
         $offre->update([

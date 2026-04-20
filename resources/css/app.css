@@ -16,10 +16,17 @@ html {
 
 body {
     font-family: var(--font-sans);
+    color-scheme: dark;
     background:
         radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 30%),
         radial-gradient(circle at top right, rgba(16, 185, 129, 0.16), transparent 28%),
         #07111f;
+}
+
+select,
+option {
+    background-color: #0f172a;
+    color: #e2e8f0;
 }
 
 #app {

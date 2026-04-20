@@ -46,7 +46,17 @@ class AuthController extends Controller
 
     public function me()
     {
-        return response()->json(Auth::user());
+        $user = Auth::user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $resolvedUser = User::query()
+            ->with('profil.competences')
+            ->find($user->id);
+
+        return response()->json($resolvedUser ?? $user);
     }
 
     public function logout()

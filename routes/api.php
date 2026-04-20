@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CandidatureController;
+use App\Http\Controllers\CompetenceController;
 use App\Http\Controllers\OffreController;
 use App\Http\Controllers\ProfilController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +13,7 @@ Route::post('/login', [AuthController::class, 'login']);
 
 Route::get('/offres', [OffreController::class, 'index']);
 Route::get('/offres/{offre}', [OffreController::class, 'show']);
+Route::get('/competences', [CompetenceController::class, 'index']);
 
 Route::middleware('auth:api')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
@@ -29,6 +31,7 @@ Route::middleware('auth:api')->group(function () {
     });
 
     Route::middleware('role:recruteur')->group(function () {
+        Route::get('/mes-offres', [OffreController::class, 'mesOffres']);
         Route::post('/offres', [OffreController::class, 'store']);
         Route::put('/offres/{offre}', [OffreController::class, 'update']);
         Route::delete('/offres/{offre}', [OffreController::class, 'destroy']);
@@ -39,6 +42,7 @@ Route::middleware('auth:api')->group(function () {
 
     Route::middleware('role:admin')->group(function () {
         Route::get('/admin/users', [AdminController::class, 'users']);
+        Route::get('/admin/offres', [AdminController::class, 'offres']);
         Route::delete('/admin/users/{user}', [AdminController::class, 'deleteUser']);
         Route::patch('/admin/offres/{offre}', [AdminController::class, 'toggleOffre']);
     });

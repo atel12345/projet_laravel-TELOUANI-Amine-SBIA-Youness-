@@ -44,6 +44,17 @@ class OffreController extends Controller
         return response()->json($offre, 201);
     }
 
+    public function mesOffres(): JsonResponse
+    {
+        $offres = Offre::query()
+            ->where('user_id', Auth::id())
+            ->withCount('candidatures')
+            ->latest()
+            ->get();
+
+        return response()->json($offres);
+    }
+
     public function update(UpdateOffreRequest $request, Offre $offre): JsonResponse
     {
         if ($offre->user_id !== Auth::id()) {
