@@ -1,5 +1,10 @@
 # Projet Laravel - Plateforme de Recrutement
 
+## Backend Features Demonstration (via React UI)
+
+https://github.com/user-attachments/assets/bf4fe3be-cafb-46fb-ad88-35bf45baede7
+
+
 ## Description
 
 Ce projet est avant tout un backend Laravel pour une plateforme type mini-LinkedIn.
